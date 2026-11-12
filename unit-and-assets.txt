@@ -1,0 +1,40 @@
+
+> circuit-ar@1.0.0 test
+> node tests/circuit-logic.test.js && node tests/placement.test.js && node scripts/check-assets.mjs
+
+✔ required connections describe the positive-to-switch-to-lamp-to-negative path (1.499822ms)
+✔ the lamp follows the switch only when all three connections are complete (0.784688ms)
+✔ wire order, color and endpoint direction do not change conductivity (1.723358ms)
+✔ disconnecting any of the six ends immediately opens the circuit; reconnecting restores it (1.190486ms)
+✔ three fully attached but incorrect wires cannot bypass the switch or lamp (0.222184ms)
+✔ a repeated correct pair contributes only one point and cannot complete a circuit (0.117686ms)
+✔ shorting an end to itself and sharing a terminal both leave the lamp off (0.147998ms)
+✔ missing wires and extra wires do not constitute the required three-wire experiment (0.131663ms)
+✔ unknown terminal identifiers are not electrical ports (0.216123ms)
+✔ malformed imported or reset state never throws and never lights the lamp (0.277982ms)
+✔ assessment does not mutate the wire state (0.318858ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17.738253
+✔ both engine horizontal-surface hit types are usable (1.411966ms)
+✔ feature points and fabricated camera poses cannot place the board (0.272994ms)
+✔ null, malformed and empty hit results are safely rejected (3.979515ms)
+✔ all three position coordinates must be finite numbers (0.388161ms)
+✔ hits behind the camera, too close or too far do not qualify (0.380961ms)
+✔ the documented 25 cm and 4 m distance boundaries are accepted (0.214821ms)
+✔ selects the nearest valid surface without changing engine results (1.055785ms)
+✔ invalid closer hits do not hide a usable surface (0.224714ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15.311167
+Asset audit passed: 11 source files, 11 local references, 16 vendor SHA-256 records; no remote application runtime references or Git LFS pointers.

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#091b2d">
+  <meta name="description" content="CircuitAR: مختبر واقع معزز لتوصيل دائرة كهربائية وتشغيل مصباح، باستخدام كاميرا iPhone أو iPad.">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <title>CircuitAR — مختبر الدائرة الكهربائية</title>
+  <!-- This product includes the XR Engine software developed by Niantic Spatial, Inc.
+       Copyright © 2026 Niantic Spatial, Inc. All rights reserved.
+       See vendor/8thwall/LICENSE and THIRD_PARTY_NOTICES.md. -->
+  <!-- Minimal readable layout remains available if the external stylesheet fails. -->
+  <style>
+    html,body{margin:0;background:#091b2d;color:#effaff;font-family:system-ui,-apple-system,Arial,sans-serif}
+    .hidden{display:none!important}button{font:inherit;min-height:48px;cursor:pointer}
+    #camerafeed{position:fixed;inset:0;width:100%;height:100%}.panel{position:relative;max-width:560px;margin:100px auto 24px;padding:24px;background:#102c43;border-radius:20px}
+    .topbar,.tracking,.controls{position:relative}.topbar{padding:16px}.controls{padding:16px}#loadStatus{display:block;margin-top:12px}noscript{position:relative;display:block;padding:24px}
+  </style>
+  <link id="appStyles" rel="stylesheet" href="./styles.css?v=repair-20261112">
+  <script src="./bootstrap.js?v=repair-20261112" defer></script>
+</head>
+<body>
+  <canvas id="camerafeed" aria-label="مشهد الواقع المعزز: اسحب أطراف الأسلاك لتوصيل الدائرة"></canvas>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">ϟ</span>
+      <span class="brand-copy"><b dir="ltr">Circuit<span>AR</span></b><small>مختبر الدائرة الكهربائية</small></span>
+    </div>
+    <nav class="header-actions" aria-label="أدوات التجربة">
+      <button id="stopBtn" class="textBtn hidden" type="button">إيقاف الكاميرا</button>
+      <button id="helpBtn" class="circleBtn" type="button" aria-label="عرض تعليمات التجربة">؟</button>
+    </nav>
+  </header>
+  <div id="tracking" class="tracking" role="status" aria-live="polite">مختبر العلوم • الصف الثالث</div>
+  <div id="crosshair" class="crosshair hidden" aria-hidden="true"><span></span></div>
+
+  <main id="startPanel" class="panel start-panel" aria-labelledby="welcomeTitle">
+    <div class="intro-top"><span class="kicker"><span class="status-dot" aria-hidden="true"></span> اكتشف الكهرباء في عالمك</span><span class="lab-id" dir="ltr">LAB / 01</span></div>
+    <div class="circuit-art" aria-hidden="true">
+      <svg viewBox="0 0 440 116" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M75 58H152M188 58H278M334 58H372V99H75V58" stroke="#1e5269" stroke-width="3" stroke-linecap="round"/>
+        <path d="M75 58H152M188 58H278" stroke="#43e0dc" stroke-width="3" stroke-linecap="round" stroke-dasharray="3 9"/>
+        <rect x="50" y="30" width="49" height="54" rx="10" fill="#13354c" stroke="#67e8e1" stroke-width="2"/>
+        <path d="M64 48H85M74.5 38V58M68 70H81" stroke="#e3ffff" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="155" cy="58" r="6" fill="#43e0dc"/><circle cx="190" cy="58" r="6" fill="#43e0dc"/>
+        <path d="M156 51L186 33" stroke="#e8faff" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="307" cy="47" r="26" fill="#ffda7620"/>
+        <path d="M294 63C294 56 287 53 287 43A20 20 0 0 1 327 43C327 53 320 56 320 63" fill="#ffe5a3" stroke="#ffe5a3" stroke-width="2"/>
+        <path d="M296 69H318M298 76H316M303 82H311" stroke="#9bb8c9" stroke-width="4" stroke-linecap="round"/>
+        <path d="M307 6V12M343 20L338 25M271 20L276 25M348 45H341M266 45H273" stroke="#ffda76" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="75" cy="99" r="4" fill="#43e0dc"/><circle cx="372" cy="99" r="4" fill="#43e0dc"/>
+      </svg>
+    </div>
+    <h1 id="welcomeTitle">دائرة صغيرة.<br><span>اكتشاف كبير!</span></h1>
+    <p class="intro-text">ضع مختبرًا على سطح حقيقي، وصّل الأسلاك الثلاثة، ثم أغلق المفتاح لترى المصباح يضيء.</p>
+    <div class="lesson-steps" aria-label="خطوات التجربة">
+      <span><b>١</b> امسح السطح</span><span><b>٢</b> وصّل الأسلاك</span><span><b>٣</b> أضئ المصباح</span>
+    </div>
+    <button id="startBtn" class="primary start-action" type="button" disabled>جارٍ تحميل محرك AR…</button>
+    <span id="loadStatus" class="small" role="status" aria-live="polite">جارٍ تجهيز ملفات التجربة…</span>
+    <button id="retryBtn" class="secondary retry-action hidden" type="button">إعادة المحاولة</button>
+    <p class="fine device-note">افتح الرابط في Safari على iPhone أو iPad متوافق، واسمح بالكاميرا. اختر سطحًا أفقيًا واضح التفاصيل وإضاءة جيدة.</p>
+    <p class="fine engine-credit" dir="ltr">XR Engine © 2026 Niantic Spatial, Inc. · <a href="./vendor/8thwall/LICENSE" target="_blank" rel="noopener">License</a></p>
+  </main>
+
+  <section id="controls" class="controls hidden" aria-label="التحكم بالدائرة">
+    <div class="control-card">
+      <div class="meter"><span id="connections">التوصيلات الصحيحة: 0 / 3</span><span id="lampState">المصباح مطفأ</span></div>
+      <div id="message" class="message" role="status" aria-live="polite">حرّك الجهاز ببطء نحو سطح أفقي، ثم اضغط «وضع الدائرة».</div>
+      <div class="buttons">
+        <button id="placeBtn" class="primary" type="button">وضع الدائرة</button>
+        <button id="switchBtn" class="secondary switch-action" type="button" aria-pressed="false" disabled>إغلاق المفتاح</button>
+        <button id="moveBtn" class="secondary" type="button" disabled>تغيير الموضع</button>
+        <button id="resetBtn" class="secondary" type="button" disabled>إعادة الأسلاك</button>
+      </div>
+      <p class="interaction-hint">اسحب طرف السلك إلى منفذ، أو المس الطرف ثم المنفذ.</p>
+    </div>
+  </section>
+
+  <section id="helpPanel" class="panel help-panel hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle" tabindex="-1">
+    <span class="kicker">دليل المستكشف الصغير</span>
+    <h2 id="helpTitle">كيف يضيء المصباح؟</h2>
+    <ol class="help-steps">
+      <li><strong>ابحث عن سطح.</strong> حرّك الجهاز ببطء نحو طاولة أو أرضية ذات تفاصيل واضحة. انتظر التتبع، ثم اضغط «وضع الدائرة».</li>
+      <li><strong>وصّل الأسلاك الثلاثة.</strong> اسحب كل طرف كروي إلى منفذ دائري. يمكنك أيضًا لمس الطرف ثم لمس المنفذ.</li>
+      <li><strong>اتبع المسار.</strong> موجب البطارية ← المفتاح ← المصباح ← سالب البطارية. لون السلك لا يغيّر التوصيل.</li>
+      <li><strong>أغلق المفتاح.</strong> المس المفتاح في المجسم أو زر «إغلاق المفتاح». عند اكتمال الدائرة يضيء المصباح وتتحرك أسهم التيار.</li>
+      <li><strong>جرّب واكتشف.</strong> افتح المفتاح أو اسحب طرفًا خارج المنفذ: ماذا يحدث للمصباح؟ لإعادة الوضع اضغط «تغيير الموضع».</li>
+    </ol>
+    <p class="fine">تجربة تعليمية افتراضية. لا تستخدم كهرباء المنزل لتجربة هذه التوصيلات.</p>
+    <button id="closeHelpBtn" class="primary" type="button">فهمت، لنجرّب!</button>
+  </section>
+  <noscript>تحتاج تجربة CircuitAR إلى JavaScript. فعّله في إعدادات المتصفح، ثم أعد تحميل الصفحة.</noscript>
+</body>
+</html>

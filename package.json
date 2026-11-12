@@ -1,0 +1,15 @@
+{
+  "name": "circuit-ar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/circuit-logic.test.js && node tests/placement.test.js && node scripts/check-assets.mjs",
+    "serve": "python3 -m http.server 8080",
+    "test:browser": "node tests/browser.mjs",
+    "test:runtime": "node tests/real-engine.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

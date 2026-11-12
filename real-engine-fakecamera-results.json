@@ -1,0 +1,113 @@
+{
+  "testedAt": "2026-11-12T14:34:56.837Z",
+  "engine": "actual bundled XR8; no API substitution",
+  "camera": "synthetic Chromium video",
+  "physicalDeviceARTested": false,
+  "browser": "Chromium with an iPad user agent; this is not Safari",
+  "checks": [
+    {
+      "name": "Bundled real XR8/Three.js initialize at the GitHub Pages project subpath",
+      "passed": true
+    },
+    {
+      "name": "Actual XR8 starts camera, creates circuit scene, and leaves UI above canvas",
+      "passed": true
+    },
+    {
+      "name": "Clicking stop ends every measured camera track and restores the start panel",
+      "passed": true
+    },
+    {
+      "name": "No uncaught JavaScript errors, failed assets, or external runtime requests",
+      "passed": true
+    }
+  ],
+  "logs": [
+    {
+      "type": "log",
+      "text": "8th Wall XR Version: 0.0.0.0s"
+    }
+  ],
+  "responses": [
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/styles.css?v=repair-20261112"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/bootstrap.js?v=repair-20261112"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/vendor/three/three.module.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/favicon.svg"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/vendor/three/three.core.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/vendor/8thwall/xr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/vendor/8thwall/xr-slam.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/app.js?v=repair-20261112"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/placement.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:40547/circuit-ar/circuit-logic.js"
+    }
+  ],
+  "running": {
+    "tracking": "حرّك الجهاز ببطء فوق سطح مضاء ذي تفاصيل",
+    "message": "حرّك الجهاز ببطء. عندما تظهر حلقة على السطح اضغط «وضع الدائرة».",
+    "tracks": [
+      {
+        "kind": "video",
+        "state": "ended"
+      },
+      {
+        "kind": "video",
+        "state": "live"
+      }
+    ],
+    "atStop": "stopBtn",
+    "atPlace": "placeBtn",
+    "sceneChildren": 5,
+    "boardCreated": true,
+    "canvasWidth": 820,
+    "canvasHeight": 1180
+  },
+  "stopped": {
+    "tracks": [
+      {
+        "kind": "video",
+        "state": "ended"
+      },
+      {
+        "kind": "video",
+        "state": "ended"
+      }
+    ],
+    "startVisible": true,
+    "stopVisible": false,
+    "status": "أُوقفت الكاميرا. اضغط لبدء تجربة جديدة."
+  },
+  "passed": true
+}

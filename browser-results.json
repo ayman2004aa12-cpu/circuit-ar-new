@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-12T14:34:45.280Z",
+  "note": "Tracking and camera mocked in interaction tests. Real engine load tested without AR session. No physical iPhone/iPad tested.",
+  "results": [
+    {
+      "name": "Local ESM dependencies initialize at GitHub Pages subpath",
+      "passed": true
+    },
+    {
+      "name": "No surface: placement disabled and circuit hidden",
+      "passed": true
+    },
+    {
+      "name": "Feature points cannot masquerade as a horizontal surface",
+      "passed": true
+    },
+    {
+      "name": "Real WebGL2 draws the complete board from a mock surface pose",
+      "passed": true,
+      "brightPixels": 157653
+    },
+    {
+      "name": "Emulated touchscreen drag and taps attach real rendered wire endpoints",
+      "passed": true
+    },
+    {
+      "name": "Occupied terminal rejects a second endpoint",
+      "passed": true
+    },
+    {
+      "name": "Complete circuit lights bulb and animates three current arrows with closed switch",
+      "passed": true
+    },
+    {
+      "name": "UI button and 3D switch both control the lamp",
+      "passed": true
+    },
+    {
+      "name": "Dragging an attached endpoint detaches it and immediately extinguishes the lamp",
+      "passed": true
+    },
+    {
+      "name": "Repositioned board at raised/yawed pose keeps wiring and supports scaled drag",
+      "passed": true
+    },
+    {
+      "name": "Tracking loss gives actionable feedback; help dialog traps focus",
+      "passed": true
+    },
+    {
+      "name": "Stop releases mock rendering session and restart supports fresh placement",
+      "passed": true
+    },
+    {
+      "name": "Camera failure is visible and permits restarting",
+      "passed": true
+    },
+    {
+      "name": "Application interaction makes no external runtime network requests",
+      "passed": true
+    },
+    {
+      "name": "No uncaught JavaScript errors during interaction",
+      "passed": true
+    },
+    {
+      "name": "Unmocked local 8th Wall binary reaches ready state without camera start",
+      "passed": true
+    },
+    {
+      "name": "Responsive layout 390×844",
+      "passed": true
+    },
+    {
+      "name": "Responsive layout 844×390",
+      "passed": true
+    },
+    {
+      "name": "Responsive layout 1024×1366",
+      "passed": true
+    },
+    {
+      "name": "Responsive layout 1366×1024",
+      "passed": true
+    },
+    {
+      "name": "Missing module shows a recoverable error instead of indefinite loading",
+      "passed": true
+    },
+    {
+      "name": "Missing engine script reports its exact local path and allows retry",
+      "passed": true
+    },
+    {
+      "name": "Session start timeout ends loading and permits retry (clock accelerated)",
+      "passed": true
+    },
+    {
+      "name": "Missing stylesheet retains readable inline fallback",
+      "passed": true
+    }
+  ]
+}
