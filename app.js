@@ -19,6 +19,7 @@ const state = {
   motionEvents: 0, orientationEvents: 0, lastMotion: 0, lastOrientation: 0,
   rawHits: [], hitError: '', cameraTrack: null, video: null,
   videoWidth: 0, videoHeight: 0, orientation: null, lastDiagnostics: 0,
+  aimX: null, aimY: null,
 };
 const WHITE = 0xe8f3fc, NAVY = 0x173449, CYAN = 0x35c9d0, GOLD = 0xffc66c;
 const material = (color, extra={}) => new THREE.MeshStandardMaterial({color, roughness:.38, metalness:.16, ...extra});
@@ -278,6 +279,7 @@ function surfaceHit(){
   const bounds=canvas.getBoundingClientRect(),aim=$('crosshair').getBoundingClientRect();
   const x=(aim.left+aim.width/2-bounds.left)/bounds.width;
   const y=(aim.top+aim.height/2-bounds.top)/bounds.height;
+  state.aimX=x;state.aimY=y;
   try{
     const hits=XR8.XrController.hitTest(x,y,['DETECTED_SURFACE','ESTIMATED_SURFACE']);
     state.rawHits=Array.isArray(hits)?hits:[];state.hitError='';
@@ -358,9 +360,13 @@ function renderDiagnostics(){
     motionEvents:String(state.motionEvents),orientationEvents:String(state.orientationEvents),
     rawHitCount:String(state.rawHits.length),usableSurfaceCount:String(usable),
     videoWidth:String(vw),videoHeight:String(vh),zoom,
+    viewportWidth:String(window.innerWidth),viewportHeight:String(window.innerHeight),
+    displayWidth:String(Math.round(bounds.width)),displayHeight:String(Math.round(bounds.height)),
+    devicePixelRatio:String(window.devicePixelRatio || 1),
+    aimX:String(state.aimX),aimY:String(state.aimY),
   });
   $('diagnosticText').textContent=[
-    'الإصدار: tracking-20261112',
+    'الإصدار: retina-20261112',
     `حالة التتبع: ${state.tracking}`,
     `سبب التتبع: ${state.trackingReason}`,
     `إطارات بيانات التتبع: ${state.realityFrames}`,
@@ -371,6 +377,9 @@ function renderDiagnostics(){
     `الكاميرا: ${state.cameraTrack?.label || 'الاسم غير متاح'}`,
     `الفيديو: ${vw} × ${vh}؛ الاتجاه: ${state.orientation ?? 'غير متاح'}`,
     `مساحة العرض: ${Math.round(bounds.width)} × ${Math.round(bounds.height)}`,
+    `نافذة المتصفح: ${window.innerWidth} × ${window.innerHeight}؛ كثافة البكسل: ${window.devicePixelRatio || 1}`,
+    `دقة الرسم الداخلية: ${canvas.width} × ${canvas.height}`,
+    `نقطة اختبار السطح: ${state.aimX?.toFixed(3) ?? '?'}، ${state.aimY?.toFixed(3) ?? '?'}`,
     `تكبير مسار الكاميرا: ${zoom}؛ تكبير الصفحة: ${window.visualViewport?.scale ?? 1}`,
     state.hitError?`خطأ اختبار السطح: ${state.hitError}`:'',
     'اختلاف أبعاد الفيديو والعرض قد يقص أطراف الصورة. غياب بيانات الحساس وحده لا يثبت رفض الإذن.',
@@ -393,7 +402,8 @@ function updateTracking(detail={}){
   }
 }
 function resizeCanvas(){
-  // XR8 owns renderer size/projection; update its canvas drawing buffer on orientation changes.
+  // CSS pins the display size to the viewport even when XR8/Three.js writes
+  // inline sizes. Only the drawing buffer is multiplied by pixel density.
   const ratio=window.devicePixelRatio || 1;
   const width=Math.round(canvas.clientWidth*ratio),height=Math.round(canvas.clientHeight*ratio);
   if(canvas.width!==width || canvas.height!==height){canvas.width=width;canvas.height=height;}
@@ -492,6 +502,7 @@ async function startSession(){
     startedAt:performance.now(),tracking:'INITIALIZING',trackingReason:'INITIALIZING',realityFrames:0,
     motionEvents:0,orientationEvents:0,lastMotion:0,lastOrientation:0,lastDiagnostics:0,
     rawHits:[],hitError:'',cameraTrack:null,video:null,videoWidth:0,videoHeight:0,orientation:null,
+    aimX:null,aimY:null,
   });
   $('startBtn').disabled=true;$('loadStatus').textContent='اسمح بالكاميرا والحركة عندما يطلب المتصفح ذلك…';
   $('placeBtn').disabled=true;$('resetBtn').disabled=true;$('switchBtn').disabled=true;$('moveBtn').disabled=true;

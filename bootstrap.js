@@ -42,7 +42,7 @@
     $('loadStatus').textContent = 'تحميل محرك تتبع الأسطح…';
     await loadXR();
     if (!window.XR8?.Threejs || !window.XR8?.XrController) throw new Error('ملفات المحرك ناقصة أو غير متوافقة. أعد رفع vendor كاملًا.');
-    const app = await import('./app.js?v=tracking-20261112');
+    const app = await import('./app.js?v=retina-20261112');
     app.initializeApp();
     $('retryBtn').classList.add('hidden');
     if (!$('appStyles').sheet) $('loadStatus').textContent='تعذر تحميل styles.css. نستخدم تنسيقًا احتياطيًا؛ أعد تحميل الصفحة إذا استمرت المشكلة.';
