@@ -2,7 +2,7 @@
 // Three.js objects are generated in code; no remote 3D models are needed.
 // The experience deliberately has NO non-AR fallback pretending to be AR.
 import * as THREE from './vendor/three/three.module.js';
-import {chooseSurfaceHit} from './placement.js';
+import {chooseSurfaceHit,intersectTrackedGround} from './placement.js?v=ground-20261112';
 import {assessCircuit} from './circuit-logic.js';
 window.THREE = THREE; // Required by the 8th Wall Threejs pipeline.
 
@@ -20,6 +20,7 @@ const state = {
   rawHits: [], hitError: '', cameraTrack: null, video: null,
   videoWidth: 0, videoHeight: 0, orientation: null, lastDiagnostics: 0,
   aimX: null, aimY: null,
+  placementSource: 'NONE', groundDistance: null,
 };
 const WHITE = 0xe8f3fc, NAVY = 0x173449, CYAN = 0x35c9d0, GOLD = 0xffc66c;
 const material = (color, extra={}) => new THREE.MeshStandardMaterial({color, roughness:.38, metalness:.16, ...extra});
@@ -283,17 +284,29 @@ function surfaceHit(){
   try{
     const hits=XR8.XrController.hitTest(x,y,['DETECTED_SURFACE','ESTIMATED_SURFACE']);
     state.rawHits=Array.isArray(hits)?hits:[];state.hitError='';
-    // Inspect engine output while initializing, but place only with stable tracking.
-    return state.tracking==='NORMAL'?chooseSurfaceHit(state.rawHits):null;
   }catch(error){
-    state.rawHits=[];state.hitError=error?.message || String(error);return null;
+    state.rawHits=[];state.hitError=error?.message || String(error);
   }
+  state.placementSource='NONE';state.groundDistance=null;
+  if(state.tracking!=='NORMAL')return null;
+  const explicitSurface=chooseSurfaceHit(state.rawHits);
+  if(explicitSurface){state.placementSource='XR8_SURFACE';return explicitSurface;}
+  // 8th Wall defines its single, dynamically tracked floor at world Y=0.
+  // This is the official Three.js ground-placement convention, not a pose
+  // invented in front of the viewer. Never use it without a tracked camera.
+  state.camera.updateMatrixWorld(true);
+  state.raycaster.setFromCamera(new THREE.Vector2(x*2-1,1-y*2),state.camera);
+  const ground=intersectTrackedGround({
+    origin:state.raycaster.ray.origin,direction:state.raycaster.ray.direction,tracking:state.tracking,
+  });
+  if(ground){state.placementSource='XR8_GROUND';state.groundDistance=ground.distance;}
+  return ground;
 }
 function placeBoard(){
   if(!state.started || !state.board)return status('ابدأ الكاميرا وانتظر جاهزية المشهد.');
   // Recheck on click rather than using a stale pose after the device moves.
   const hit=surfaceHit();
-  if(!hit)return status('لم نعثر على سطح أفقي بعد. وجّه العلامة نحو أرضية مضاءة ذات تفاصيل وحرّك الجهاز ببطء.');
+  if(!hit)return status('وجّه العلامة لأسفل نحو أرضية قريبة، وانتظر استقرار تتبع الجهاز.');
   cancelPointer();
   state.board.position.copy(hit.position);
   const dir=state.camera.position.clone().sub(state.board.position);
@@ -304,7 +317,9 @@ function placeBoard(){
   $('crosshair').classList.add('hidden');
   $('placeBtn').classList.add('hidden');
   $('resetBtn').disabled=false;$('switchBtn').disabled=false;$('moveBtn').disabled=false;
-  status(hit.type==='ESTIMATED_SURFACE'?'تم وضع الدائرة على سطح تقديري متتبع. تحقق من ارتفاعه، ثم وصّل الأسلاك.':'تم تثبيت الدائرة. اسحب طرف كل سلك إلى منفذ، أو المس الطرف ثم المنفذ.');
+  status(hit.type==='TRACKED_GROUND'?'تم وضع الدائرة على الأرضية التي يتتبعها المحرك. اسحب أطراف الأسلاك لتوصيلها.':
+    hit.type==='ESTIMATED_SURFACE'?'تم وضع الدائرة على سطح تقديري من المحرك. تحقق من ارتفاعه، ثم وصّل الأسلاك.':
+    'تم تثبيت الدائرة. اسحب طرف كل سلك إلى منفذ، أو المس الطرف ثم المنفذ.');
 }
 function animateAr(time){
   if(!state.board||!state.placed || state.tracking!=='NORMAL')return;
@@ -364,14 +379,18 @@ function renderDiagnostics(){
     displayWidth:String(Math.round(bounds.width)),displayHeight:String(Math.round(bounds.height)),
     devicePixelRatio:String(window.devicePixelRatio || 1),
     aimX:String(state.aimX),aimY:String(state.aimY),
+    placementSource:state.placementSource,groundDistance:state.groundDistance===null?'':String(state.groundDistance),
   });
   $('diagnosticText').textContent=[
-    'الإصدار: retina-20261112',
+    'الإصدار: ground-20261112',
     `حالة التتبع: ${state.tracking}`,
     `سبب التتبع: ${state.trackingReason}`,
     `إطارات بيانات التتبع: ${state.realityFrames}`,
     `نتائج السطح: ${state.rawHits.length}؛ صالحة للمسافة: ${usable}`,
     `أنواع النتائج: ${state.rawHits.map(h=>`${h.type} (${Number.isFinite(h.distance)?h.distance.toFixed(2):'?'} م)`).join('، ') || 'لا توجد'}`,
+    `مصدر الوضع: ${state.placementSource==='XR8_GROUND'?'أرضية 8th Wall المتتبعة':state.placementSource==='XR8_SURFACE'?'نتيجة سطح من المحرك':'لا توجد نقطة أرضية مناسبة بعد'}`,
+    `مسافة الأرضية: ${state.groundDistance===null?'غير متاحة':state.groundDistance.toFixed(2)+' م'}`,
+    `ارتفاع الكاميرا في العالم: ${state.camera?state.camera.getWorldPosition(new THREE.Vector3()).y.toFixed(3)+' م':'غير متاح'}`,
     `الحركة: ${state.motionEvents}؛ آخر بيانات: ${age(state.lastMotion)}`,
     `الاتجاه: ${state.orientationEvents}؛ آخر بيانات: ${age(state.lastOrientation)}`,
     `الكاميرا: ${state.cameraTrack?.label || 'الاسم غير متاح'}`,
@@ -395,6 +414,7 @@ function updateTracking(detail={}){
     state.trackingReason==='TOO_MUCH_MOTION'?'أبطئ حركة الجهاز لتحسين التتبع':'التتبع غير مستقر بعد';
   if(!normal){
     state.surface=null;
+    state.placementSource='NONE';state.groundDistance=null;
     if(state.reticle)state.reticle.visible=false;
     $('placeBtn').disabled=true;
     if(state.pointer)cancelPointer();
@@ -428,7 +448,7 @@ function initializeScenePipeline(){
       $('stopBtn').classList.remove('hidden');$('crosshair').classList.remove('hidden');
       $('retryBtn').classList.add('hidden');
       ensureDiagnostics();renderDiagnostics();
-      status('حرّك الجهاز ببطء. عندما تظهر حلقة على السطح اضغط «وضع الدائرة».');
+      status('انتظر استقرار التتبع ووجّه العلامة لأسفل نحو الأرضية. عند ظهور الحلقة اضغط «وضع الدائرة».');
     },
     onUpdate:({processCpuResult})=>{
       const reality=processCpuResult?.reality;
@@ -445,8 +465,13 @@ function initializeScenePipeline(){
         }
         $('placeBtn').disabled=!state.surface;
         $('crosshair').classList.toggle('surface-found',!!state.surface);
-        if(state.surface)$('tracking').textContent='✓ سطح جاهز — اضغط وضع الدائرة';
-        else if(state.tracking==='NORMAL')$('tracking').textContent='التتبع مستقر — وجّه العلامة إلى السطح';
+        if(state.surface){
+          $('tracking').textContent=state.placementSource==='XR8_GROUND'?'✓ الأرضية المتتبعة جاهزة — ضع الدائرة':'✓ سطح جاهز — اضغط وضع الدائرة';
+          status(state.placementSource==='XR8_GROUND'?'اضغط «وضع الدائرة» لتثبيتها على أرضية المحرك المتتبعة.':'اضغط «وضع الدائرة» عند الموضع المحدد بالحلقة.');
+        }else if(state.tracking==='NORMAL'){
+          $('tracking').textContent='التتبع مستقر — وجّه العلامة لأسفل نحو الأرضية';
+          status('وجّه العلامة إلى أرضية قريبة، بعيدًا عن الأفق أو الجدار. يحدد المحرك مستوى أرضية واحدًا.');
+        }
       }
       if(performance.now()-state.lastDiagnostics>500){
         state.lastDiagnostics=performance.now();renderDiagnostics();
@@ -503,6 +528,7 @@ async function startSession(){
     motionEvents:0,orientationEvents:0,lastMotion:0,lastOrientation:0,lastDiagnostics:0,
     rawHits:[],hitError:'',cameraTrack:null,video:null,videoWidth:0,videoHeight:0,orientation:null,
     aimX:null,aimY:null,
+    placementSource:'NONE',groundDistance:null,
   });
   $('startBtn').disabled=true;$('loadStatus').textContent='اسمح بالكاميرا والحركة عندما يطلب المتصفح ذلك…';
   $('placeBtn').disabled=true;$('resetBtn').disabled=true;$('switchBtn').disabled=true;$('moveBtn').disabled=true;
