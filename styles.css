@@ -135,3 +135,40 @@ noscript { z-index: 8; background: #14334a; margin: 140px auto 0; max-width: 560
   .help-panel { top: 50%; max-height: calc(100% - 24px); }
 }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+
+/* One learning question at a time; technical diagnostics stay in Help. */
+.lesson-panel { position:fixed;z-index:2;top:calc(env(safe-area-inset-top,0px) + 132px);left:50%;transform:translateX(-50%);width:min(620px,calc(100% - 32px));padding:12px 17px;border:1px solid #6fa6aa88;border-radius:16px;background:#0d293deb;box-shadow:0 6px 30px #00101833;pointer-events:none; }
+.lesson-step { font-size:11px;font-weight:750;color:#76e6d8; }
+.lesson-panel h2 { margin:3px 0 4px;font-size:18px;line-height:1.4;color:#f8ffff; }
+.lesson-panel p { margin:0;font-size:12px;line-height:1.7;color:#d5e8ed; }
+.prediction-controls { display:flex;gap:8px;margin-top:9px;pointer-events:auto; }
+.prediction-controls button { flex:1;min-height:44px;border:1px solid #8dc7c6;border-radius:10px;background:#e5f5ed;color:#103b46;font-size:13px;font-weight:700;padding:7px; }
+.learning-tools { display:flex;justify-content:center;gap:12px;margin-top:5px; }
+.learning-tools button { min-height:44px;padding:6px 12px;background:transparent;color:#c3e6e5;font-size:12px;border-radius:8px; }
+.learning-tools button[aria-pressed="true"] { background:#245b61;color:#f1ffff; }
+#controls .buttons button { min-width:80px; }
+#closeHelpBtn { margin-top:12px; }
+#sessionDiagnostics { text-align:right; }
+@media (max-width:420px) {
+ .lesson-panel{top:calc(env(safe-area-inset-top,0px) + 126px);padding:10px 13px;}
+ .lesson-panel h2{font-size:16px;}
+ .lesson-panel p{font-size:11px;line-height:1.6;}
+ .control-card{padding:11px 12px;}
+ .message{font-size:12px;padding:7px;margin:7px 0 9px;}
+ #controls .buttons button{font-size:12px;min-width:76px;}
+ .learning-tools{margin-top:2px;}
+}
+@media (max-height:500px) {
+ .lesson-panel{left:12px;top:70px;transform:none;width:225px;padding:9px 12px;}
+ .lesson-panel h2{font-size:15px;}
+ .lesson-panel p{font-size:11px;line-height:1.55;}
+ .prediction-controls{flex-wrap:wrap;gap:5px;margin-top:5px;}
+ .prediction-controls button{font-size:11px;min-height:44px;}
+ .controls{left:auto;right:8px;bottom:8px;width:300px;padding:0;background:none;}
+ .learning-tools button{font-size:11px;padding:4px 8px;}
+ .crosshair{left:38%;top:60%;}
+}
+.tracking { width:max-content; }
+.circuit-summary{margin:18px 0;padding:12px;border:1px solid #497385;border-radius:12px;background:#0c2539;}
+.circuit-summary svg{display:block;width:100%;max-height:145px;}
+.circuit-summary figcaption{margin-top:8px;font-size:11px;line-height:1.7;color:#b1cad8;text-align:center;}

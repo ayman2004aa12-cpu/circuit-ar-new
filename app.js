@@ -3,7 +3,8 @@
 // The experience deliberately has NO non-AR fallback pretending to be AR.
 import * as THREE from './vendor/three/three.module.js';
 import {chooseSurfaceHit,intersectTrackedGround} from './placement.js?v=ground-20261112';
-import {assessCircuit} from './circuit-logic.js';
+import {assessCircuit} from './circuit-logic.js?v=education-20261112';
+import {createCircuitKit} from './circuit-scene.js?v=education-20261112';
 window.THREE = THREE; // Required by the 8th Wall Threejs pipeline.
 
 const $ = (id) => document.getElementById(id);
@@ -21,6 +22,7 @@ const state = {
   videoWidth: 0, videoHeight: 0, orientation: null, lastDiagnostics: 0,
   aimX: null, aimY: null,
   placementSource: 'NONE', groundDistance: null,
+  kit:null, result:null, internalArrows:[], lesson:{mode:'guided',prediction:null,hasLit:false,testedOpen:false,testedBreak:false,hint:false},
 };
 const WHITE = 0xe8f3fc, NAVY = 0x173449, CYAN = 0x35c9d0, GOLD = 0xffc66c;
 const material = (color, extra={}) => new THREE.MeshStandardMaterial({color, roughness:.38, metalness:.16, ...extra});
@@ -29,22 +31,8 @@ const white = material(WHITE);
 const navy = material(NAVY);
 const gold = material(GOLD,{metalness:.32});
 const wireMaterials = [material(0xf85f65), material(0x49d1ed), material(0xffd257)];
-const terminalInfo = [
-  {id:'batteryPlus', x:-.345, z:-.125, name:'+'},
-  {id:'batteryMinus', x:-.215, z:-.125, name:'−'},
-  {id:'switchIn', x:-.056, z:-.12, name:'1'},
-  {id:'switchOut',x:.062,z:-.12,name:'2'},
-  {id:'lampPlus',x:.216,z:-.12,name:'+'},
-  {id:'lampMinus',x:.346,z:-.12,name:'−'},
-];
-const requiredPairs = [
-  ['batteryPlus','switchIn'], ['switchOut','lampPlus'], ['lampMinus','batteryMinus'],
-];
-const wireInitial = [
-  [{x:-.32,z:.115},{x:-.17,z:.115}],
-  [{x:-.055,z:.205},{x:.10,z:.205}],
-  [{x:.175,z:.305},{x:.335,z:.305}],
-];
+let wireInitial=[];
+const HANDLE_HEIGHT=.075;
 
 function status(message) { $('message').textContent = message; }
 function sphere(radius, mat, segments=18) { return new THREE.Mesh(new THREE.SphereGeometry(radius, segments, 12), mat); }
@@ -53,54 +41,14 @@ function cylinder(r1,r2,h,mat,segments=24) { return new THREE.Mesh(new THREE.Cyl
 function add(parent,obj,x=0,y=0,z=0) { obj.position.set(x,y,z);parent.add(obj);return obj; }
 function interactive(mesh, info) { mesh.userData = {...mesh.userData,...info}; state.interactive.push(mesh);return mesh; }
 function writeLabel(text, width=.14, height=.065, bg='#173449',fg='#ffffff') {
-  const c=document.createElement('canvas');c.width=1024;c.height=Math.round(1024*height/width);
-  const g=c.getContext('2d');g.direction='rtl';g.fillStyle=bg;g.fillRect(0,0,c.width,c.height);
+  const c=document.createElement('canvas');c.width=512;c.height=Math.round(512*height/width);
+  const g=c.getContext('2d');g.direction=/[ء-ي]/.test(text)?'rtl':'ltr';g.fillStyle=bg;g.fillRect(0,0,c.width,c.height);
   g.fillStyle=fg;let fontSize=Math.min(160,c.height*.6);g.font=`bold ${fontSize}px Arial, sans-serif`;
   if(g.measureText(text).width>c.width*.92){fontSize*=c.width*.92/g.measureText(text).width;g.font=`bold ${fontSize}px Arial, sans-serif`;}
   g.textAlign='center';g.textBaseline='middle';g.fillText(text,c.width/2,c.height/2);
   const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;
   const obj=new THREE.Mesh(new THREE.PlaneGeometry(width,height),new THREE.MeshBasicMaterial({map:texture,transparent:true,side:THREE.DoubleSide}));
   obj.rotation.x=-Math.PI/2;return obj;
-}
-function addPort(parent, cfg) {
-  const root=new THREE.Group();root.position.set(cfg.x,.048,cfg.z);parent.add(root);
-  const base=add(root,cylinder(.037,.037,.018,metal),0,0,0);
-  const connector=add(root,cylinder(.019,.019,.023,gold),0,.017,0);
-  const hit=add(root,cylinder(.055,.055,.014,new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false})),0,.025,0);
-  interactive(hit,{port:cfg.id});
-  const port = {id:cfg.id,x:cfg.x,z:cfg.z,root,connector,base};
-  state.ports.set(cfg.id,port);
-  const label=writeLabel(cfg.name,.045,.03,'#173449','#ffffff');add(parent,label,cfg.x,.041,cfg.z+.055);
-}
-function createBattery(board) {
-  const x=-.279,z=-.235;
-  const foundation=add(board,box(.21,.028,.16,metal),x,.045,z);
-  const body=add(board,box(.18,.093,.125,navy),x,.102,z);
-  const stripe=add(board,box(.039,.094,.127,gold),x-.062,.103,z);
-  add(board,writeLabel('بطارية',.15,.05),x,.153,z);
-  return {foundation,body,stripe};
-}
-function createSwitch(board) {
-  const x=0,z=-.235;
-  add(board,box(.19,.035,.14,metal),x,.055,z);
-  const bed=add(board,box(.11,.029,.067,navy),x,.086,z);
-  const lever=add(board,box(.09,.023,.029,material(0xefab73)),x-.014,.117,z);
-  interactive(lever,{switch:true});interactive(bed,{switch:true});
-  state.switchLever=lever;
-  add(board,writeLabel('مفتاح',.16,.05),x,.116,z-.081);
-}
-function createLamp(board) {
-  const x=.282,z=-.235;
-  add(board,cylinder(.066,.078,.025,metal),x,.06,z);
-  add(board,cylinder(.040,.044,.039,navy),x,.089,z);
-  const bulbMat=material(0xe0ebf2,{transparent:true,opacity:.92,emissive:0x1a2430,emissiveIntensity:.25,roughness:.13,metalness:0});
-  const bulb=add(board,sphere(.061,bulbMat,24),x,.153,z);
-  add(board,cylinder(.016,.016,.065,material(0xeaae62,{emissive:0x5c2a00})),x,.135,z);
-  const light=new THREE.PointLight(0xffcc66,0,0.65);light.position.set(x,.16,z);board.add(light);
-  const halo = add(board,new THREE.Mesh(new THREE.TorusGeometry(.076,.008,9,32), new THREE.MeshBasicMaterial({color:0xffd66b,transparent:true,opacity:0})), x,.155,z);
-  halo.rotation.x=Math.PI/2;
-  state.lamp={bulb,light,halo,bulbMat};
-  add(board,writeLabel('مصباح',.16,.05),x,.047,z-.097);
 }
 function createWire(index,board) {
   const wire={index,color:wireMaterials[index],ends:wireInitial[index].map((p)=>({...p,port:null})),tube:null,handles:[],arrow:null,curve:null};
@@ -109,67 +57,126 @@ function createWire(index,board) {
     interactive(handle,{wire:index,end:i});board.add(handle);wire.handles.push(handle);
   }
   const arrow=new THREE.Mesh(new THREE.ConeGeometry(.015,.043,8),new THREE.MeshBasicMaterial({color:0x82fff3}));
-  arrow.visible=false;board.add(arrow);wire.arrow=arrow;
+  arrow.visible=false;arrow.userData.current='wire';board.add(arrow);wire.arrow=arrow;
   state.wires.push(wire);refreshWire(wire);
 }
+function routedPoints(wire,pa,pb){
+  const h=.083+wire.index*.009,left=-.435-wire.index*.009,right=.435+wire.index*.009;
+  const top=-.410-wire.index*.008,bottom=.258+wire.index*.013;
+  const v=(x,z)=>new THREE.Vector3(x,h,z);
+  const a=state.ports.get(wire.ends[0].port),b=state.ports.get(wire.ends[1].port);
+  if(!a||!b){const mid=pa.clone().lerp(pb,.5);mid.y=.10;mid.z+=.018;return [pa,mid,pb];}
+  let route=[];
+  if(a.component===b.component){
+    if(a.component==='battery')route=[v(left,a.z),v(left,b.z)];
+    if(a.component==='lamp')route=[v(right,a.z),v(right,b.z)];
+    if(a.component==='switch')route=[v(a.x,top),v(b.x,top)];
+  }else{
+    const canonical=(first,second)=>{
+      if(first.component==='battery'&&second.component==='switch')return [v(left,first.z),v(left,top),v(second.x,top)];
+      if(first.component==='switch'&&second.component==='lamp')return [v(first.x,top),v(right,top),v(right,second.z)];
+      if(first.component==='battery'&&second.component==='lamp')return [v(left,first.z),v(left,bottom),v(right,bottom),v(right,second.z)];
+      return null;
+    };
+    route=canonical(a,b)||canonical(b,a)?.reverse()||[];
+  }
+  return [pa,...route,pb];
+}
 function refreshWire(wire) {
-  if (!state.board) return;
-  const a=wire.ends[0],b=wire.ends[1];
-  const pa=new THREE.Vector3(a.x,.085,a.z), pb=new THREE.Vector3(b.x,.085,b.z);
-  const between=pa.clone().lerp(pb,.5);between.y=.135;
-  wire.curve=new THREE.CatmullRomCurve3([pa,between,pb]);
-  if (wire.tube) {state.board.remove(wire.tube);wire.tube.geometry.dispose();}
-  wire.tube=new THREE.Mesh(new THREE.TubeGeometry(wire.curve,18,.008,7,false),wire.color);
-  state.board.add(wire.tube);
+  if(!state.board)return;
+  const [a,b]=wire.ends,pa=new THREE.Vector3(a.x,HANDLE_HEIGHT,a.z),pb=new THREE.Vector3(b.x,HANDLE_HEIGHT,b.z);
+  const path=routedPoints(wire,pa,pb).filter((p,i,all)=>!i||p.distanceToSquared(all[i-1])>1e-9);
+  wire.curve=new THREE.CatmullRomCurve3(path,false,'centripetal');
+  if(wire.tube){state.board.remove(wire.tube);wire.tube.geometry.dispose();}
+  wire.tube=new THREE.Mesh(new THREE.TubeGeometry(wire.curve,56,.0075,8,false),wire.color);state.board.add(wire.tube);
   wire.handles[0].position.copy(pa);wire.handles[1].position.copy(pb);
 }
 function createBoard(scene) {
-  state.board=new THREE.Group();state.board.visible=false;scene.add(state.board);
-  const board=state.board;
-  board.scale.setScalar(.65);
-  add(board,box(.87,.025,.69,material(0xe8edf0,{roughness:.65})),0,.012,0);
-  add(board,box(.88,.012,.7,material(0x247e91,{metalness:.55})),0,-.008,0);
-  add(board,writeLabel('مختبر الدوائر الكهربائية',.51,.058,'#173449','#bafaff'),0,.027,-.305);
-  add(board,writeLabel('اسحب أطراف الأسلاك إلى دوائر التوصيل',.49,.052,'#2a5364','#ffffff'),0,.028,.385);
-  add(board,box(.79,.012,.245,material(0xd2e3ea)),0,.031,-.192);
-  for(const cfg of terminalInfo)addPort(board,cfg);
-  createBattery(board);createSwitch(board);createLamp(board);
-  for(let i=0;i<3;i++)createWire(i,board);
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(.92,.75),new THREE.ShadowMaterial({opacity:.28}));
-  shadow.rotation.x=-Math.PI/2;shadow.receiveShadow=true;board.add(shadow);
-  // Keep the AR board level with the single horizontal plane tracked by 8th Wall.
+  state.board=new THREE.Group();state.board.name='educational-circuit';state.board.visible=false;state.board.scale.setScalar(.62);scene.add(state.board);
+  state.kit=createCircuitKit({THREE,board:state.board,registerInteractive:interactive,writeLabel});
+  state.ports=state.kit.ports;state.lamp=state.kit.lamp;state.switchLever=state.kit.switchLever;
+  wireInitial=state.kit.layout.wireInitial;
+  state.lesson={mode:'guided',prediction:null,hasLit:false,testedOpen:false,testedBreak:false,hint:false};
+  for(let i=0;i<3;i++)createWire(i,state.board);
+  state.internalArrows=[];
+  for(const component of ['switch','lamp']){
+    const curve=new THREE.CatmullRomCurve3(state.kit.internalPaths[component]);
+    const arrow=new THREE.Mesh(new THREE.ConeGeometry(.012,.032,8),new THREE.MeshBasicMaterial({color:0x0bafa6,depthTest:false}));
+    arrow.visible=false;arrow.userData.current='component';arrow.renderOrder=2;state.board.add(arrow);state.internalArrows.push({component,curve,mesh:arrow});
+  }
   refreshElectricalState();
 }
-function wireMatch(wire,pair) {
-  const endpoints=wire.ends.map(e=>e.port);return endpoints.includes(pair[0])&&endpoints.includes(pair[1]);
+function signature(a,b){return [a,b].sort().join(':');}
+function hintPair(){
+  const options=[];
+  for(const reverse of [false,true])for(const flipSwitch of [false,true])for(const flipLamp of [false,true]){
+    const sw=flipSwitch?['switchOut','switchIn']:['switchIn','switchOut'];
+    const lp=flipLamp?['lampMinus','lampPlus']:['lampPlus','lampMinus'];
+    const [first,second]=reverse?[lp,sw]:[sw,lp];
+    options.push([['batteryPlus',first[0]],[first[1],second[0]],[second[1],'batteryMinus']]);
+  }
+  const complete=state.wires.filter(w=>w.ends.every(e=>e.port)).map(w=>signature(...w.ends.map(e=>e.port)));
+  const score=option=>complete.filter(s=>option.some(p=>signature(...p)===s)).length;
+  options.sort((a,b)=>score(b)-score(a));
+  if(score(options[0])!==complete.length)return null;
+  return options[0].find(pair=>!complete.includes(signature(...pair)))||null;
+}
+function renderLesson(){
+  if(!$('lessonPanel'))return;
+  const r=state.result||assessCircuit(state.wires,state.switchClosed),l=state.lesson;
+  let step='ضع المختبر',title='ابدأ من أرضية واضحة',text='انتظر الحلقة، ثم ضع مختبر الدائرة أمامك.';
+  if(state.placed){
+    if(l.mode==='explore'){step='استكشاف حر';title='غيّر، جرّب، ثم فسّر';text='جرّب ترتيبًا آخر للمكونات، وافتح المفتاح وافصل سلكًا. ما الذي يبقي المصباح مضيئًا؟';}
+    else if(!r.connected&&!l.hasLit){step='١ · ركّب';title='اصنع مسارًا مغلقًا';text='صل الأسلاك الثلاثة بحيث يمر المسار بالبطارية والمفتاح والمصباح. كل سلك له طرفان.';}
+    else if(!l.hasLit){step='٢ · توقّع';title=l.prediction?'اختبر توقّعك':'ماذا سيحدث إذا أغلقت المفتاح؟';text=l.prediction?'أغلق المفتاح، ثم قارن النتيجة بتوقّعك.':'الأسلاك موصولة والمفتاح مفتوح. اختر توقّعك، ثم جرّب.';}
+    else if(!l.testedOpen){step='٣ · جرّب';title='افتح المفتاح وراقب المصباح';text=l.prediction==='no'?'توقعت أن يبقى مطفأ، لكنه أضاء لأن المفتاح أكمل المسار. افتح المفتاح الآن.':l.prediction==='yes'?'توقعك صحيح: أضاء المصباح عند اكتمال المسار. افتح المفتاح وراقب الفجوة.':'رأيت المصباح يضيء. ماذا يحدث عندما تظهر فجوة في المفتاح؟';}
+    else if(!l.testedBreak){step='٤ · اكتشف';title='هل للأسلاك دور؟';text=state.switchClosed?'اسحب طرف سلك خارج المنفذ. راقب المصباح ومسار التيار.':'فتح المفتاح قطع المسار فانطفأ المصباح. أغلقه، ثم افصل طرف سلك.';}
+    else{step='اكتمل النشاط';title='اكتشفت سر الدائرة!';text='يضيء المصباح عندما يكون المسار كاملًا والمفتاح مغلقًا. فتح المفتاح أو فصل سلك يقطع التيار.';}
+  }
+  $('lessonStep').textContent=step;$('lessonTitle').textContent=title;$('lessonText').textContent=text;
+  $('predictionControls').classList.toggle('hidden',!(state.placed&&l.mode==='guided'&&r.connected&&!l.hasLit&&!l.prediction));
+  $('exploreBtn').textContent=l.mode==='explore'?'العودة للنشاط':'استكشاف حر';$('exploreBtn').setAttribute('aria-pressed',String(l.mode==='explore'));
+  $('exploreBtn').disabled=!state.placed;$('hintBtn').disabled=!state.placed||r.connected;
+  $('hintBtn').setAttribute('aria-pressed',String(l.hint));
+  const pair=l.hint&&!r.connected?hintPair():null;
+  for(const port of state.ports.values()){
+    const occupied=state.wires.some(w=>w.ends.some(e=>e.port===port.id));
+    port.ring.material.color.setHex(pair?.includes(port.id)?0x17a99b:occupied?0x367c91:0x94aaa9);
+    port.ring.material.emissiveIntensity=pair?.includes(port.id) ? .65 : 0;
+  }
+  if(pair){
+    const names={batteryPlus:'موجب البطارية',batteryMinus:'سالب البطارية',switchIn:'المفتاح (أ)',switchOut:'المفتاح (ب)',lampPlus:'المصباح (أ)',lampMinus:'المصباح (ب)'};
+    $('lessonText').textContent=`تلميح: صل ${names[pair[0]]} بـ ${names[pair[1]]}. أُضيء المنفذان لمساعدتك، واختر أي سلك.`;
+  }else if(l.hint&&!r.connected)$('lessonText').textContent='تتبّع الأسلاك: يوجد توصيل خارج مسار المكونات. افصل طرفًا وجرّب مسارًا يمر بالمفتاح والمصباح.';
+  $('lessonPanel').dataset.stage=step;$('controls').dataset.circuitConnected=String(r.connected);$('controls').dataset.lampLit=String(r.lit);$('controls').dataset.circuitReason=r.reason||'';$('controls').dataset.attachedEnds=String(r.attachedEnds||0);
 }
 function refreshElectricalState() {
-  const result=assessCircuit(state.wires,state.switchClosed);
-  $('connections').textContent=`التوصيلات الصحيحة: ${result.correctCount} / 3`;
-  $('lampState').textContent=result.lit?'💡 المصباح مضيء':'المصباح مطفأ';
-  $('lampState').classList.toggle('is-lit', result.lit);
-  $('switchBtn').textContent=state.switchClosed?'فتح المفتاح':'إغلاق المفتاح';
-  $('switchBtn').setAttribute('aria-pressed',String(state.switchClosed));
+  const previous=state.result,result=assessCircuit(state.wires,state.switchClosed);state.result=result;
+  if(result.lit)state.lesson.hasLit=true;
+  if(state.lesson.hasLit&&previous?.lit&&result.connected&&!state.switchClosed)state.lesson.testedOpen=true;
+  if(state.lesson.hasLit&&previous?.lit&&!result.connected&&state.switchClosed)state.lesson.testedBreak=true;
+  $('connections').textContent=`الأسلاك الموصولة: ${result.connectedWireCount??result.correctCount} / 3`;
+  $('lampState').textContent=result.lit?'💡 المصباح مضيء':'المصباح مطفأ';$('lampState').classList.toggle('is-lit',result.lit);
+  $('switchBtn').textContent=state.switchClosed?'فتح المفتاح':'إغلاق المفتاح';$('switchBtn').setAttribute('aria-pressed',String(state.switchClosed));
   if(state.lamp){
-    state.lamp.bulbMat.color.setHex(result.lit?0xffefad:0xe0ebf2);
-    state.lamp.bulbMat.emissive.setHex(result.lit?0xffa600:0x1a2430);
-    state.lamp.bulbMat.emissiveIntensity=result.lit?2.8:.25;
-    state.lamp.light.intensity=result.lit?1.7:0;
-    state.lamp.halo.material.opacity=result.lit?.8:0;
+    const l=state.lamp;l.bulbMat.color.setHex(result.lit?0xffefd0:0xd8f3ff);l.bulbMat.emissiveIntensity=result.lit?.12:0;
+    l.filamentMat.color.setHex(result.lit?0xfff0b3:0x9b6132);l.filamentMat.emissiveIntensity=result.lit?4:0;
+    l.light.intensity=result.lit?.35:0;l.halo.material.opacity=result.lit?.55:0;
   }
-  if(state.switchLever) {
-    state.switchLever.rotation.z=state.switchClosed?0:-.55;
-    state.switchLever.material.color.setHex(state.switchClosed?0x55d6ad:0xefab73);
+  if(state.switchLever)state.switchLever.rotation.z=state.switchClosed?0:.65;
+  state.wires.forEach(w=>w.arrow.visible=result.lit);state.internalArrows.forEach(a=>a.mesh.visible=result.lit);
+  if(state.placed){
+    if(result.lit)status(result.matchesLessonRoute===false?'أضاء المصباح! ترتيبك يعمل أيضًا؛ المهم مسار مغلق يمر بالمكونات.':'أضاء المصباح! التيار يمر في المسار المغلق من موجب البطارية إلى سالبها.');
+    else if(result.connected)status('المسار مكتمل بالأسلاك، لكن المفتاح مفتوح: توجد فجوة تمنع مرور التيار.');
+    else if(result.reason==='short'||result.reason==='incorrect')status('تتبّع المسار من البطارية. يجب أن يمر بالمفتاح والمصباح دون تجاوزهما.');
+    else if(previous?.lit)status('انقطع المسار عند طرف السلك، فانطفأ المصباح وتوقفت أسهم التيار.');
+    else status('اسحب طرف السلك إلى منفذ، أو المس الطرف ثم المنفذ. يمكن فصل أي طرف وإعادة توصيله.');
   }
-  state.wires.forEach(w=>w.arrow.visible=result.lit&&requiredPairs.some(p=>wireMatch(w,p)));
-  if(result.lit) status('أحسنت! اكتملت الدائرة وأُغلق المفتاح، فأضاء المصباح.');
-  else if(result.connected)status('اكتملت الدائرة! اضغط المفتاح لإغلاقه وتشغيل المصباح.');
-  else if(result.correctCount===3)status('تحقق من جميع أطراف التوصيل.');
-  else if(state.placed)status('المس أحد أطراف السلك واسحبه إلى منفذ دائري. يجب تركيب ثلاثة أسلاك صحيحة.');
+  renderLesson();
 }
 function resetWires() {
   state.wires.forEach((wire,i)=>{wire.ends=wireInitial[i].map(p=>({...p,port:null}));refreshWire(wire);});
-  state.selected=null;state.switchClosed=false;refreshElectricalState();
+  state.selected=null;state.switchClosed=false;state.lesson={mode:'guided',prediction:null,hasLit:false,testedOpen:false,testedBreak:false,hint:false};refreshElectricalState();
 }
 function projectScreen(event) {
   state.scene?.updateMatrixWorld(true);
@@ -182,7 +189,7 @@ function pickObject(event){
   state.raycaster.setFromCamera(projectScreen(event),state.camera);
   const hits=state.raycaster.intersectObjects(state.interactive,false);
   // A handle overlaps its socket after connection: keep it selectable for detaching.
-  if(hits.length)return (hits.find(h=>h.object.userData.wire!==undefined) || hits[0]).object;
+  if(hits.length)return (hits.find(h=>h.object.userData.wire!==undefined) || hits.find(h=>h.object.userData.port) || hits[0]).object;
   // Preserve a 44 CSS-pixel touch target even when a physical handle projects smaller.
   const bounds=canvas.getBoundingClientRect();
   let nearest=null,distance=22;
@@ -243,12 +250,13 @@ function onPointerMove(e){
   if(!state.pointer || state.pointer.id!==e.pointerId || !state.selected)return;
   if(Math.hypot(e.clientX-state.pointer.x,e.clientY-state.pointer.y)<6 && !state.pointer.moved)return;
   state.pointer.moved=true;
-  const level=state.board.localToWorld(new THREE.Vector3(0,.085,0)).y;
+  const level=state.board.localToWorld(new THREE.Vector3(0,HANDLE_HEIGHT,0)).y;
   const world=worldPointOnLevel(e,level);
   if(!world)return;
   const local=state.board.worldToLocal(world.clone());
   const wire=state.wires[state.selected.wire];const end=wire.ends[state.selected.end];
-  end.port=null;end.x=THREE.MathUtils.clamp(local.x,-.41,.41);end.z=THREE.MathUtils.clamp(local.z,-.31,.34);
+  const bounds=state.kit.layout.boardBounds;
+  end.port=null;end.x=THREE.MathUtils.clamp(local.x,bounds.minX,bounds.maxX);end.z=THREE.MathUtils.clamp(local.z,bounds.minZ,bounds.maxZ);
   refreshWire(wire);refreshElectricalState();e.preventDefault();
 }
 function onPointerUp(e){
@@ -317,23 +325,28 @@ function placeBoard(){
   $('crosshair').classList.add('hidden');
   $('placeBtn').classList.add('hidden');
   $('resetBtn').disabled=false;$('switchBtn').disabled=false;$('moveBtn').disabled=false;
+  renderLesson();
   status(hit.type==='TRACKED_GROUND'?'تم وضع الدائرة على الأرضية التي يتتبعها المحرك. اسحب أطراف الأسلاك لتوصيلها.':
     hit.type==='ESTIMATED_SURFACE'?'تم وضع الدائرة على سطح تقديري من المحرك. تحقق من ارتفاعه، ثم وصّل الأسلاك.':
     'تم تثبيت الدائرة. اسحب طرف كل سلك إلى منفذ، أو المس الطرف ثم المنفذ.');
 }
 function animateAr(time){
-  if(!state.board||!state.placed || state.tracking!=='NORMAL')return;
-  const result=assessCircuit(state.wires,state.switchClosed);
-  if(!result.lit)return;
+  if(!state.board||!state.placed||state.tracking!=='NORMAL'||!state.result?.lit)return;
+  const path=state.result.currentPath||[];
   state.wires.forEach(wire=>{
-    const pair=requiredPairs.find(pair=>wireMatch(wire,pair));if(!pair || !wire.curve)return;
-    const indexOfStart=wire.ends.findIndex(e=>e.port===pair[0]);
-    const t=((time*.00035)+(wire.index*.17))%1;const u=indexOfStart===0?t:1-t;
-    const p=wire.curve.getPoint(u);const tangent=wire.curve.getTangent(u);
-    if(indexOfStart!==0)tangent.negate();
-    wire.arrow.position.copy(p);wire.arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),tangent.normalize());
+    const segment=path.find(p=>p.wire===wire.index);if(!segment||!wire.curve)return;
+    const forward=wire.ends[0].port===segment.from,t=(time*.00023+wire.index*.27)%1,u=forward?t:1-t;
+    const tangent=wire.curve.getTangent(u).multiplyScalar(forward?1:-1).normalize();
+    wire.arrow.position.copy(wire.curve.getPoint(u));wire.arrow.position.y+=.008;
+    wire.arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),tangent);
   });
-  if(state.lamp)state.lamp.halo.material.opacity=.55+.24*Math.sin(time*.004);
+  for(const entry of state.internalArrows){
+    const outgoing=path.find(p=>p.from.startsWith(entry.component)),canonical=entry.component==='switch'?'switchOut':'lampMinus';
+    const forward=outgoing?.from===canonical,t=(time*.00023+.12)%1,u=forward?t:1-t;
+    entry.mesh.position.copy(entry.curve.getPoint(u));entry.mesh.position.y+=.006;
+    entry.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),entry.curve.getTangent(u).multiplyScalar(forward?1:-1).normalize());
+  }
+  state.lamp.halo.material.opacity=.50+.05*Math.sin(time*.003);
 }
 function trackingHint(){
   const hints={
@@ -358,7 +371,7 @@ function ensureDiagnostics(){
     try{await navigator.clipboard.writeText(text.textContent);copy.textContent='تم النسخ';}
     catch{copy.textContent='تعذر النسخ؛ التقط صورة للتشخيص';}
   });
-  details.append(summary,text,copy);($('controls').querySelector('.control-card') || $('controls')).appendChild(details);
+  details.append(summary,text,copy);$('helpPanel').insertBefore(details,$('closeHelpBtn'));
 }
 function renderDiagnostics(){
   if(!$('sessionDiagnostics'))return;
@@ -382,7 +395,7 @@ function renderDiagnostics(){
     placementSource:state.placementSource,groundDistance:state.groundDistance===null?'':String(state.groundDistance),
   });
   $('diagnosticText').textContent=[
-    'الإصدار: ground-20261112',
+    'الإصدار: education-20261112',
     `حالة التتبع: ${state.tracking}`,
     `سبب التتبع: ${state.trackingReason}`,
     `إطارات بيانات التتبع: ${state.realityFrames}`,
@@ -437,7 +450,7 @@ function initializeScenePipeline(){
       clearTimeout(state.sessionTimer);
       const {scene,camera,renderer}=XR8.Threejs.xrScene();
       state.scene=scene;state.camera=camera;state.renderer=renderer;
-      scene.add(new THREE.HemisphereLight(0xffffff,0x667788,2.4));
+      scene.add(new THREE.HemisphereLight(0xffffff,0x778c97,1.8));
       const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(2,5,3);scene.add(light);
       camera.position.set(0,1.6,0);
       XR8.XrController.updateCameraProjectionMatrix({origin:camera.position,facing:camera.quaternion});
@@ -446,7 +459,7 @@ function initializeScenePipeline(){
       state.reticle.rotation.x=-Math.PI/2;state.reticle.visible=false;scene.add(state.reticle);
       $('startPanel').classList.add('hidden');$('controls').classList.remove('hidden');
       $('stopBtn').classList.remove('hidden');$('crosshair').classList.remove('hidden');
-      $('retryBtn').classList.add('hidden');
+      $('retryBtn').classList.add('hidden');$('lessonPanel').classList.remove('hidden');renderLesson();
       ensureDiagnostics();renderDiagnostics();
       status('انتظر استقرار التتبع ووجّه العلامة لأسفل نحو الأرضية. عند ظهور الحلقة اضغط «وضع الدائرة».');
     },
@@ -512,8 +525,8 @@ function endSession(message='أُوقفت الكاميرا. اضغط لبدء ت
   geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());materials.forEach(m=>m.dispose());
   state.board=null;state.reticle=null;state.scene=null;state.camera=null;state.renderer=null;
   state.wires=[];state.ports.clear();state.interactive=[];state.switchClosed=false;state.lamp=null;state.switchLever=null;state.surface=null;
-  state.cameraTrack=null;state.video=null;
-  $('controls').classList.add('hidden');$('startPanel').classList.remove('hidden');
+  state.cameraTrack=null;state.video=null;state.kit=null;state.result=null;state.internalArrows=[];
+  $('controls').classList.add('hidden');$('lessonPanel').classList.add('hidden');$('startPanel').classList.remove('hidden');
   $('placeBtn').classList.remove('hidden');$('placeBtn').disabled=true;
   $('crosshair').classList.remove('surface-found');state.lastHit=0;
   $('crosshair').classList.add('hidden');$('stopBtn').classList.add('hidden');
@@ -580,14 +593,21 @@ export function initializeApp(){
   $('moveBtn').addEventListener('click',()=>{
     if(!state.board)return;cancelPointer();state.placed=false;state.board.visible=false;
     $('placeBtn').classList.remove('hidden');$('placeBtn').disabled=true;$('crosshair').classList.remove('hidden');
-    $('resetBtn').disabled=true;$('switchBtn').disabled=true;$('moveBtn').disabled=true;
+    $('resetBtn').disabled=true;$('switchBtn').disabled=true;$('moveBtn').disabled=true;renderLesson();
     status('وجّه العلامة إلى سطح جديد. عند ظهور الحلقة اضغط «وضع الدائرة».');
   });
+  $('hintBtn').addEventListener('click',()=>{state.lesson.hint=!state.lesson.hint;renderLesson();});
+  $('exploreBtn').addEventListener('click',()=>{state.lesson.mode=state.lesson.mode==='guided'?'explore':'guided';state.lesson.hint=false;renderLesson();});
+  for(const [id,value] of [['predictYes','yes'],['predictNo','no']])$(id).addEventListener('click',()=>{state.lesson.prediction=value;renderLesson();});
   $('helpBtn').addEventListener('click',()=>{cancelPointer();$('helpPanel').classList.remove('hidden');$('closeHelpBtn').focus();});
   $('closeHelpBtn').addEventListener('click',()=>{$('helpPanel').classList.add('hidden');$('helpBtn').focus();});
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'){$('helpPanel').classList.add('hidden');$('helpBtn').focus();}
-    if(event.key==='Tab' && !$('helpPanel').classList.contains('hidden')){event.preventDefault();$('closeHelpBtn').focus();}
+    if(event.key==='Tab' && !$('helpPanel').classList.contains('hidden')){
+      const targets=[...$('helpPanel').querySelectorAll('button,summary,a[href]')].filter(el=>el.getClientRects().length && !el.disabled);
+      const index=targets.indexOf(document.activeElement),next=(index+(event.shiftKey?-1:1)+targets.length)%targets.length;
+      if(targets.length){event.preventDefault();targets[next].focus();}
+    }
   });
   document.addEventListener('visibilitychange',()=>{if(document.hidden && state.started)endSession('أُوقفت الكاميرا عند مغادرة الصفحة. ابدأ تجربة جديدة عند العودة.');});
   window.addEventListener('pagehide',()=>{if(state.started)endSession();});

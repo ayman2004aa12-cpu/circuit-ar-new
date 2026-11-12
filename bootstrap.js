@@ -42,7 +42,11 @@
     $('loadStatus').textContent = 'تحميل محرك تتبع الأسطح…';
     await loadXR();
     if (!window.XR8?.Threejs || !window.XR8?.XrController) throw new Error('ملفات المحرك ناقصة أو غير متوافقة. أعد رفع vendor كاملًا.');
-    const app = await import('./app.js?v=ground-20261112');
+    try { await import('./circuit-scene.js?v=education-20261112'); }
+    catch (error) { throw new Error('تعذر تحميل circuit-scene.js. ارفع ملف المجسمات الجديد في جذر المستودع.', {cause:error}); }
+    const logic = await import('./circuit-logic.js?v=education-20261112');
+    if (!Array.isArray(logic.assessCircuit([],false).currentPath)) throw new Error('نسخة circuit-logic.js قديمة. ارفع ملفات التحديث الستة كاملة.');
+    const app = await import('./app.js?v=education-20261112');
     app.initializeApp();
     $('retryBtn').classList.add('hidden');
     if (!$('appStyles').sheet) $('loadStatus').textContent='تعذر تحميل styles.css. نستخدم تنسيقًا احتياطيًا؛ أعد تحميل الصفحة إذا استمرت المشكلة.';
